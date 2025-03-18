@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureDevOps2GitHubMigrator", "src\AzureDevOps2GitHubMigrator.csproj", "{EDE02162-7871-10C1-48FC-D980A92A623F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EDE02162-7871-10C1-48FC-D980A92A623F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EDE02162-7871-10C1-48FC-D980A92A623F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EDE02162-7871-10C1-48FC-D980A92A623F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EDE02162-7871-10C1-48FC-D980A92A623F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {751428CA-6811-400B-A67E-05A95B80BE0B}
+	EndGlobalSection
+EndGlobal

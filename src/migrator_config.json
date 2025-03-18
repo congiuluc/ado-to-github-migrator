@@ -1,0 +1,20 @@
+{
+  "AzureDevOps": {
+    "Version": "cloud",
+    "BaseUrl": "https://dev.azure.com",
+    "Organization": "",
+    "Pat": ""
+  },
+  "GitHub": {
+    "Organization": "",
+    "Pat": "",
+    "DefaultTeamMemberRole": "member"
+  },
+  "Migration": {
+    "MigrateTeams": true,
+    "RepoNamePattern": "{projectName}-{repoName}",
+    "TeamNamePattern": "{projectName}-{teamName}",
+    "UsersMappingFile": "",
+    "DryRun": true
+  }
+}
