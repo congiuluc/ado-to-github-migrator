@@ -30,7 +30,8 @@ jobs:
       run: dotnet publish src/AzureDevOps2GitHubMigrator.csproj --configuration Release --output ./publish --no-restore
       
     - name: Zip Release
-      run: cd publish && zip -r ../AzureDevOps2GitHubMigrator.zip *
+      run: |
+        powershell -Command "Compress-Archive -Path publish\* -DestinationPath AzureDevOps2GitHubMigrator.zip"
       
     - name: Create Release
       uses: softprops/action-gh-release@v1
