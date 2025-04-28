@@ -205,121 +205,45 @@ public class RepositoryMigrator
                 try
                 {
                     Logger.LogInfo("Pushing to GitHub...");
-                    var pushInfo = new ProcessStartInfo
+                    
+                    // First, configure git to exclude pull request references
+                    var configPushResult = await ProcessRunner.RunProcessAsync(
+                        "git",
+                        "config --local --unset-all remote.github.mirror",
+                        workingDirectory: tempPath);
+                    
+                    // Use a direct push command that specifies the refs explicitly instead of relying on refspecs
+                    var pushResult = await ProcessRunner.RunProcessAsync(
+                        "git",
+                        "push github --all",  // Push all branches
+                        workingDirectory: tempPath,
+                        timeoutSeconds: 3600); // Large repositories may take time to push
+                        
+                    // Also push all tags separately
+                    if (pushResult.success)
                     {
-                        FileName = "git",
-                        Arguments = "push --mirror github",  // Changed to use --mirror to preserve all refs exactly
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-
-                    using var processPush = Process.Start(pushInfo);
-                    if (processPush == null)
-                        throw new Exception("Failed to start git push process");
-
-                    // Handle output asynchronously to prevent blocking
-                    processPush.OutputDataReceived += (sender, e) =>
+                        var pushTagsResult = await ProcessRunner.RunProcessAsync(
+                            "git",
+                            "push github --tags",  // Push all tags
+                            workingDirectory: tempPath,
+                            timeoutSeconds: 1200);
+                            
+                        pushSuccess = pushTagsResult.success;
+                    }
+                    else
                     {
-                        if (!string.IsNullOrEmpty(e.Data))
-                            Logger.LogInfo($"Push output: {e.Data}");
-                    };
-                    processPush.ErrorDataReceived += (sender, e) =>
-                    {
-                        if (!string.IsNullOrEmpty(e.Data))
-                            Logger.LogDebug($"Push error: {e.Data}");
-                    };
-
-                    processPush.BeginOutputReadLine();
-                    processPush.BeginErrorReadLine();
-
-                    // Add timeout to prevent infinite waiting
-                    var timeout = TimeSpan.FromMinutes(10);
-                    if (await Task.WhenAny(processPush.WaitForExitAsync(), Task.Delay(timeout)) == Task.WhenAny(processPush.WaitForExitAsync()))
-                    {
-                        processPush.Kill(true);
-                        throw new TimeoutException($"Push operation timed out after {timeout.TotalMinutes} minutes");
+                        pushSuccess = false;
                     }
 
-                    await processPush.WaitForExitAsync();
-                    if (processPush.ExitCode == 0)
+                    if (pushSuccess)
                     {
-                        pushSuccess = true;
                         Logger.LogSuccess("Successfully pushed repository to GitHub");
-                        /*
-                        // Set the default branch with retries
-                        var setDefaultBranchSuccess = false;
-                        var defaultBranchRetryCount = 0;
-                        await Task.Delay(TimeSpan.FromSeconds(10));
-                        while (!setDefaultBranchSuccess && defaultBranchRetryCount < maxRetries)
-                        {
-                            try
-                            {
-                                if (defaultBranchRetryCount > 0)
-                                {
-                                    Logger.LogInfo($"Retrying to set default branch (attempt {defaultBranchRetryCount + 1} of {maxRetries})...");
-                                    await Task.Delay(TimeSpan.FromSeconds(retryDelaySeconds));
-                                }
-
-                                Logger.LogInfo($"Setting default branch to {mainBranchName}...");
-                                _githubService.UpdatePat(githubPat);
-                                setDefaultBranchSuccess = await _githubService.SetDefaultBranchAsync(githubOrg, repoName, mainBranchName);
-
-                                if (setDefaultBranchSuccess)
-                                {
-
-                                    Logger.LogSuccess($"Successfully set default branch to {mainBranchName}");
-                                    break;
-
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.LogWarning($"Failed to set default branch (attempt {defaultBranchRetryCount + 1}): {ex.Message}");
-                                defaultBranchRetryCount++;
-                            }
-                        }
-
-                        if (!setDefaultBranchSuccess)
-                        {
-                            Logger.LogError($"Failed to set default branch to {mainBranchName} after {maxRetries} attempts");
-                        }
-                        */
                         break;
-                    }
-                    else if (retryCount < maxRetries - 1)  // Try force push on next attempt if regular push failed
-                    {
-                        Logger.LogWarning("Push failed. Will attempt force push on next retry.");
-                        var nextAttemptArgs = retryCount == maxRetries - 2 ? "push --force --mirror github -v" : "push --mirror github -v";
-                        Logger.LogInfo($"Next attempt will use: git {nextAttemptArgs}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    var errorMessage = ex.Message;
-                    if (ex is TimeoutException)
-                    {
-                        Logger.LogError($"Push attempt {retryCount + 1} timed out: {errorMessage}");
-                    }
-                    else
-                    {
-                        Logger.LogError($"Push attempt {retryCount + 1} failed: {errorMessage}");
-                        // Try to get more detailed git error information
-                        try
-                        {
-                            var gitStatus = await ProcessRunner.RunProcessAsync("git", "status", timeoutSeconds: 30);
-                            if (gitStatus.success)
-                            {
-                                Logger.LogInfo("Git status:");
-                                Logger.LogInfo(gitStatus.output);
-                            }
-                        }
-                        catch (Exception statusEx)
-                        {
-                            Logger.LogWarning($"Failed to get git status: {statusEx.Message}");
-                        }
-                    }
+                    Logger.LogError($"Push attempt {retryCount + 1} failed: {ex.Message}", ex);
                 }
 
                 retryCount++;

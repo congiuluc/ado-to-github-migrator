@@ -117,7 +117,7 @@ public class MigrationReportCommand
 
                 var reportFile = $"{DateTime.Now:yyyyMMddHHmm}_{finalAdoOrg}_migration_report.md";
                 MigrationReport.GenerateMarkdownReport(migrationProjects, finalAdoOrg!, adoUrl, finalGithubOrg!, reportFile);
-                Logger.LogSuccess($"Assessment report generated successfully. Report saved to {reportFile}");
+                Logger.LogSuccess($"Assessment report generated successfully. Report saved to {workingDir}\\{reportFile}");
             }
             catch (Exception ex)
             {

@@ -109,7 +109,7 @@ public class AdoAssessmentCommand
                     await File.WriteAllTextAsync(outputFile, results.ToJson());
                 }
 
-                Logger.LogSuccess($"Assessment completed successfully. Results saved to {outputFile}");
+                Logger.LogSuccess($"Assessment completed successfully. Results saved to {workingDir}\\{outputFile}");
             }
             catch (Exception ex)
             {
