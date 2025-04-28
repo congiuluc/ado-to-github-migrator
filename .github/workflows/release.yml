@@ -1,0 +1,42 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore src/AzureDevOps2GitHubMigrator.sln
+      
+    - name: Build
+      run: dotnet build src/AzureDevOps2GitHubMigrator.sln --configuration Release --no-restore
+      
+    #- name: Test
+    #  run: dotnet test tests/AzureDevOps2GitHubMigrator.Tests.csproj --configuration Release --no-build
+      
+    - name: Publish
+      run: dotnet publish src/AzureDevOps2GitHubMigrator.csproj --configuration Release --output ./publish --no-restore
+      
+    - name: Zip Release
+      run: cd publish && zip -r ../AzureDevOps2GitHubMigrator.zip *
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: AzureDevOps2GitHubMigrator.zip
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true

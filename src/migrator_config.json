@@ -1,0 +1,26 @@
+{
+  "AzureDevOps": {
+    "Version": "cloud",
+    "BaseUrl": "https://dev.azure.com",
+    "Organization": "[YOUR_ORGANIZATION_HERE]",
+    "Pat": "",
+    "Projects": "Project1,Project2"
+  },
+  "GitHub": {
+    "Organization": "[YOUR_GITHUB_ORG_HERE]",
+    "Pat": "",
+    "DefaultTeamMemberRole": "member"
+  },
+  "Migration": {
+    "MigrateTeams": true,
+    "RepoNamePattern": "{projectName}-{repoName}",
+    "TeamNamePattern": "{projectName}-{teamName}",
+    "UsersMappingFile": "[PATH_TO_USER_MAPPING_FILE]",
+    "UsePatForClone": true
+  },
+  "Git": {
+    "DisableSSLVerify": false,
+    "UsePatForClone": false
+  },
+  "WorkingDirectory": "[PATH_TO_WORKING_DIRECTORY]"
+}

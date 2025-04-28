@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AzureDevOps2GitHubMigrator": {
+      "commandName": "Project",
+      "commandLineArgs": "migrate"
+    }
+  }
+}
