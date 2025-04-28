@@ -17,6 +17,7 @@ public class Program
         // Add all commands
         rootCommand.AddCommand(CheckGitCommand.Create());
         rootCommand.AddCommand(CheckGitTfsCommand.Create());
+        rootCommand.AddCommand(CheckGitHubCliCommand.Create());
         rootCommand.AddCommand(InstallGitCommand.Create());
         rootCommand.AddCommand(InstallGitTfsCommand.Create());
         rootCommand.AddCommand(AdoAssessmentCommand.Create());

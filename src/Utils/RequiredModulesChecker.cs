@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AzureDevOps2GitHubMigrator.Utils;
 
 namespace AzureDevOps2GitHubMigrator.Utils;
 
@@ -8,6 +9,7 @@ namespace AzureDevOps2GitHubMigrator.Utils;
 /// <remarks>
 /// This class is responsible for:
 /// - Checking Git and git-tfs installations.
+/// - Checking GitHub CLI installation.
 /// - Dependency validation before migration.
 /// - Automated installation of missing components.
 /// - Version compatibility checks.
@@ -15,50 +17,53 @@ namespace AzureDevOps2GitHubMigrator.Utils;
 public static class RequiredModulesChecker
 {
     /// <summary>
-    /// Checks and installs required modules for repository migration
+    /// Ensures that all required modules for migration are available.
     /// </summary>
-    /// <param name="requireGitTfs">Indicates whether git-tfs is required (true for TFVC migrations).</param>
-    /// <returns>Returns true if all required modules are available, otherwise false.</returns>
-    /// <exception cref="Exception">Throws an exception if any error occurs during the validation process.</exception>
-    /// <remarks>
-    /// Performs the following checks:
-    /// 1. Verifies Git installation
-    /// 2. Installs Git if missing
-    /// 3. Optionally checks and installs git-tfs
-    /// </remarks>
+    /// <param name="requireGitTfs">Whether git-tfs is required for this migration</param>
+    /// <returns>True if all required modules are available, false otherwise</returns>
     public static async Task<bool> EnsureRequiredModulesAsync(bool requireGitTfs = false)
     {
-        Logger.LogInfo("Checking required modules...");
-
-        // Check Git installation
-        var gitInstalled = await VerifyGitAsync();
-        if (!gitInstalled)
+        Logger.LogInfo("Checking required tools...");
+        
+        // Check git
+        var gitCheck = await VerifyGitAsync();
+        if (!gitCheck)
         {
-            Logger.LogWarning("Git is not installed. Attempting to install...");
-            gitInstalled = await GitInstaller.InstallGitAsync();
-            if (!gitInstalled)
+            Logger.LogError("Git is not installed or not properly configured!");
+            Logger.LogInfo("Please install Git using one of the following methods:");
+            Logger.LogInfo("1. Windows: Use the 'install-git' command or download from https://git-scm.com/download/win");
+            Logger.LogInfo("2. macOS: Run 'brew install git' or download from https://git-scm.com/download/mac");
+            Logger.LogInfo("3. Linux: Use your distribution's package manager (apt, yum, etc.)");
+            return false;
+        }
+        
+        // Check GitHub CLI
+        var ghCheck = await VerifyGitHubCliAsync();
+        if (!ghCheck)
+        {
+            Logger.LogError("GitHub CLI is not installed or not properly configured!");
+            Logger.LogInfo("Please install GitHub CLI using one of the following methods:");
+            Logger.LogInfo("1. Windows: winget install -e --id GitHub.cli or download from https://cli.github.com/");
+            Logger.LogInfo("2. macOS: Run 'brew install gh'");
+            Logger.LogInfo("3. Linux: Use your distribution's package manager or download from https://cli.github.com/");
+            return false;
+        }
+        
+        // Only check git-tfs if required
+        if (requireGitTfs)
+        {
+            var gitTfsCheck = await VerifyGitTfsAsync();
+            if (!gitTfsCheck)
             {
-                Logger.LogError("Failed to install Git. Please install it manually from https://git-scm.com/downloads");
+                Logger.LogError("git-tfs is not installed or not properly configured!");
+                Logger.LogInfo("Please install git-tfs using one of the following methods:");
+                Logger.LogInfo("1. Windows: Use the 'install-git-tfs' command");
+                Logger.LogInfo("2. Manual: Download from https://github.com/git-tfs/git-tfs/releases");
                 return false;
             }
         }
-
-        // Check git-tfs if required
-        if (requireGitTfs)
-        {
-            Logger.LogInfo("Checking git-tfs installation...");
-            var gitTfsInstalled = await VerifyGitTfsAsync();
-            if (!gitTfsInstalled)
-            {
-                gitTfsInstalled = await GitTfsInstaller.EnsureGitTfsInstalledAsync();
-                if (!gitTfsInstalled)
-                {
-                    Logger.LogError("Failed to install git-tfs. Please install it manually using: choco install gittfs");
-                    return false;
-                }
-            }
-        }
-
+        
+        Logger.LogSuccess("All required tools are available.");
         return true;
     }
 
@@ -152,6 +157,34 @@ public static class RequiredModulesChecker
         catch (Exception ex)
         {
             Logger.LogError($"Error verifying git-tfs installation: {ex.Message}", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Verifies that GitHub CLI is properly installed and accessible
+    /// </summary>
+    /// <returns>True if GitHub CLI is available and working, false otherwise</returns>
+    public static async Task<bool> VerifyGitHubCliAsync()
+    {
+        try
+        {
+            Logger.LogInfo("Checking GitHub CLI installation...");
+            var (success, output, error) = await ProcessRunner.RunProcessAsync("gh", "--version", timeoutSeconds: 10);
+            
+            if (!success)
+            {
+                Logger.LogWarning("GitHub CLI check failed");
+                Logger.LogDebug($"Error: {error}");
+                return false;
+            }
+            
+            Logger.LogSuccess($"GitHub CLI is available: {output.Split('\n')[0].Trim()}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"GitHub CLI check failed: {ex.Message}");
             return false;
         }
     }

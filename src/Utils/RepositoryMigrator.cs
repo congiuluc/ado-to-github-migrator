@@ -140,23 +140,6 @@ public class RepositoryMigrator
 
             Directory.SetCurrentDirectory(tempPath);
 
-            // Set HEAD to point to the desired default branch
-            Logger.LogInfo($"Setting HEAD symbolic reference to {mainBranchName}...");
-            var setHeadResult = await ProcessRunner.RunProcessAsync(
-                "git",
-                $"symbolic-ref HEAD refs/heads/{mainBranchName}",
-                workingDirectory: tempPath);
-
-            if (!setHeadResult.success)
-            {
-                Logger.LogWarning($"Failed to set HEAD symbolic reference: {setHeadResult.error}");
-            }
-            else
-            {
-                Logger.LogSuccess($"HEAD symbolic reference set to {mainBranchName}");
-            }
-
-
             // Add GitHub remote and push
             Logger.LogInfo("Setting up GitHub remote...");
             var githubRemoteUrl = $"https://x-access-token:{githubPat}@github.com/{githubOrg}/{repoName}.git";
@@ -205,20 +188,20 @@ public class RepositoryMigrator
                 try
                 {
                     Logger.LogInfo("Pushing to GitHub...");
-                    
+
                     // First, configure git to exclude pull request references
                     var configPushResult = await ProcessRunner.RunProcessAsync(
                         "git",
                         "config --local --unset-all remote.github.mirror",
                         workingDirectory: tempPath);
-                    
+
                     // Use a direct push command that specifies the refs explicitly instead of relying on refspecs
                     var pushResult = await ProcessRunner.RunProcessAsync(
                         "git",
                         "push github --all",  // Push all branches
                         workingDirectory: tempPath,
                         timeoutSeconds: 3600); // Large repositories may take time to push
-                        
+
                     // Also push all tags separately
                     if (pushResult.success)
                     {
@@ -227,19 +210,40 @@ public class RepositoryMigrator
                             "push github --tags",  // Push all tags
                             workingDirectory: tempPath,
                             timeoutSeconds: 1200);
-                            
+
                         pushSuccess = pushTagsResult.success;
                     }
                     else
                     {
                         pushSuccess = false;
                     }
-
                     if (pushSuccess)
                     {
                         Logger.LogSuccess("Successfully pushed repository to GitHub");
+
+                        // Set default branch using GitHub CLI
+                        Logger.LogDebug($"Setting default branch to {mainBranchName} using GitHub CLI...");
+
+                        
+                        var setDefaultBranchResult = await ProcessRunner.RunProcessAsync(
+                            "gh",
+                            $"api -X PATCH repos/{githubOrg}/{repoName} -f default_branch={mainBranchName}  -H \"Authorization: token {githubPat}",
+                            workingDirectory: tempPath);
+
+                        if (setDefaultBranchResult.success)
+                        {
+                            Logger.LogSuccess($"Successfully set default branch to {mainBranchName}");
+                            Logger.LogSuccess("Repository was migrated successfully.");
+                        }
+                        else
+                        {
+                            Logger.LogWarning($"Failed to set default branch using GitHub CLI: {setDefaultBranchResult.error}");
+                            Logger.LogWarning("Repository was migrated successfully, but default branch may need manual configuration.");
+                        }
+
                         break;
                     }
+
                 }
                 catch (Exception ex)
                 {
@@ -295,7 +299,7 @@ public class RepositoryMigrator
         string azureDevOpsPat,
         int maxRetries,
         int retryDelaySeconds,
-        string workingDir) 
+        string workingDir)
     {
         var tempPath = Path.Combine(workingDir, $"tfvc_migration_{repoName}");
 
@@ -335,7 +339,7 @@ public class RepositoryMigrator
                 try
                 {
                     // Add authentication to source URL if usePatForClone is true
-                 
+
                     var result = await ProcessRunner.RunProcessAsync(
                         "git",
                         $"tfs clone {sourceRepoUrl} {mainBranchName} {tempPath} --branches=all",
