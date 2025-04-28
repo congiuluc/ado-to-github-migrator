@@ -20,6 +20,7 @@ public class Program
         rootCommand.AddCommand(CheckGitHubCliCommand.Create());
         rootCommand.AddCommand(InstallGitCommand.Create());
         rootCommand.AddCommand(InstallGitTfsCommand.Create());
+        rootCommand.AddCommand(InstallGitHubCliCommand.Create());
         rootCommand.AddCommand(AdoAssessmentCommand.Create());
         rootCommand.AddCommand(ExportUsersCommand.Create());
         //rootCommand.AddCommand(ExportGithubUsersCommand.Create());
