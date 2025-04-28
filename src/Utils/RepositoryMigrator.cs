@@ -202,6 +202,7 @@ public class RepositoryMigrator
                         workingDirectory: tempPath,
                         timeoutSeconds: 3600); // Large repositories may take time to push
 
+
                     // Also push all tags separately
                     if (pushResult.success)
                     {
