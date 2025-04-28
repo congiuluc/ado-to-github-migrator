@@ -96,7 +96,7 @@ public class MigrationService
                     }
 
                     repo.GitHubRepoName = githubRepoName;
-                    
+
                     if (await _githubService.RepositoryExistsAsync(githubOrg, githubRepoName))
                     {
                         repo.GitHubRepoUrl = $"https://github.com/{githubOrg}/{githubRepoName}";
@@ -104,7 +104,21 @@ public class MigrationService
                         repo.GitHubRepoMigrationStatus = MigrationStatus.PartiallyCompleted;
                         if (!await _githubService.IsRepositoryEmptyAsync(githubOrg, githubRepoName))
                         {
-                            repo.GitHubRepoMigrationStatus = MigrationStatus.Completed;
+
+                            var defaultBranch = await _githubService.GetDefaultBranchAsync(githubOrg, githubRepoName);
+                            if (!string.Equals(defaultBranch, repo.DefaultBranch, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Logger.LogWarning($"Repository '{githubRepoName}' has a different default branch '{defaultBranch}' than expected '{repo.DefaultBranch}'.");
+                                repo.GitHubRepoMigrationStatus = MigrationStatus.PartiallyCompleted;
+                                repo.GitHubRepoMigrationError = $"Repository already exists with different default branch '{defaultBranch}'";
+                            }
+                            else
+                            {
+                                Logger.LogInfo($"Repository '{githubRepoName}' already exists with the same default branch '{repo.DefaultBranch}'");
+                                repo.GitHubRepoMigrationStatus = MigrationStatus.Completed;
+                            }
+
+
                         }
                     }
                     else if (repo.RepositoryType.Equals("git", StringComparison.OrdinalIgnoreCase) && repo.BranchCount == 0)
@@ -155,7 +169,7 @@ public class MigrationService
                                     }
                                 }
 
-                               
+
                             }
                             else
                             {
@@ -314,7 +328,7 @@ public class MigrationService
                         repo.GitHubRepoMigrationStatus = MigrationStatus.PartiallyCompleted;
                         Logger.LogSuccess($"Repository {repo.GitHubRepoName} created successfully in GitHub.");
                     }
-                    
+
                     var repoMigrated = await RepositoryMigrator.MigrateRepositoryContentAsync(
                         repo.Url,
                         project.GitHubOrganization!,
@@ -396,7 +410,7 @@ public class MigrationService
                                 // Check if the user is an Azure DevOps team administrator
                                 if (member.IsTeamAdmin)
                                 {
-                                    if (member.GitHubUserName!= null)
+                                    if (member.GitHubUserName != null)
                                     {
                                         Logger.LogInfo($"Set user '{member.GitHubUserName}' as in GitHub team '{team.GitHubTeamName}' admin.");
                                         var teamAdmin = await _githubService.SetTeamAdminAsync(project.GitHubOrganization!, team.GitHubTeamName, member.GitHubUserName);
@@ -405,7 +419,7 @@ public class MigrationService
                                             member.GitHubUserMigrationStatus = MigrationStatus.PartiallyCompleted;
                                             member.GitHubUserMigrationError = $"Member not team {team.GitHubTeamName} admin";
                                         }
-                                       
+
                                     }
                                 }
                             }
@@ -464,9 +478,9 @@ public class MigrationService
             Thread.Sleep(5000);
             foreach (var project in projects)
             {
-                foreach (var repo in project.Repos.Where(r =>  r.GitHubRepoMigrationStatus == MigrationStatus.Completed && r.RepositoryType.ToLower() == "git" ))
+                foreach (var repo in project.Repos.Where(r => r.GitHubRepoMigrationStatus == MigrationStatus.Completed && r.RepositoryType.ToLower() == "git"))
                 {
-                   
+
                     try
                     {
                         Logger.LogInfo($"Checking default branch for repository: {repo.GitHubRepoName}");
@@ -482,7 +496,19 @@ public class MigrationService
                                 try
                                 {
                                     Logger.LogInfo($"Updating default branch for repository: {repo.GitHubRepoName} from '{currentDefaultBranch}' to '{repo.DefaultBranch}'");
-                                    await _githubService.UpdateDefaultBranchAsync(project.GitHubOrganization!, repo.GitHubRepoName, repo.DefaultBranch!);
+
+                                    // Use GitHub CLI to update the default branch
+                                    var (success, output, error) = await ProcessRunner.RunProcessAsync(
+                                        "gh",
+                                        $"api repos/{project.GitHubOrganization}/{repo.GitHubRepoName} --method PATCH -f default_branch={repo.DefaultBranch} -H \"Authorization: token {_githubPat}\"",
+                                        workingDirectory: workingDir,
+                                        timeoutSeconds: 60);
+
+                                    if (!success)
+                                    {
+                                        throw new Exception($"Failed to update default branch: {error}");
+                                    }
+
                                     Logger.LogSuccess($"Default branch updated successfully for repository: {repo.GitHubRepoName}");
                                     break; // Exit loop if successful
                                 }

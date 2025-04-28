@@ -25,6 +25,7 @@ This tool facilitates the migration of repositories, teams, and projects from Az
 - .NET 9.0 SDK or runtime
 - Git (v2.30.0 or later recommended)
 - Git-TFS (for TFVC repositories)
+- GitHub CLI (gh) for certain operations like updating default branches
 - Personal Access Tokens with appropriate scopes:
   - **Azure DevOps PAT**: Requires Code (read), Project and team (read), User profile (read)
   - **GitHub PAT**: Requires repo, admin:org, admin:public_key scopes
