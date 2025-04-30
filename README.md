@@ -25,7 +25,6 @@ This tool facilitates the migration of repositories, teams, and projects from Az
 - .NET 9.0 SDK or runtime
 - Git (v2.30.0 or later recommended)
 - Git-TFS (for TFVC repositories)
-- GitHub CLI (gh) for certain operations like updating default branches
 - Personal Access Tokens with appropriate scopes:
   - **Azure DevOps PAT**: Requires Code (read), Project and team (read), User profile (read)
   - **GitHub PAT**: Requires repo, admin:org, admin:public_key scopes
@@ -276,6 +275,12 @@ The `export-users` command helps generate the initial template with Azure DevOps
 - **API Rate Limits**: Both Azure DevOps and GitHub have API rate limits that may affect migration speed
 - **Memory Requirements**: Large migrations may require significant memory, especially for team migrations with many members
 - **Working Directory**: Ensure sufficient disk space in the working directory for repository clones
+
+## Important Disclaimer for TFVC Repositories
+
+> **WARNING**: When migrating Team Foundation Version Control (TFVC) repositories, you **MUST** thoroughly verify the migrated content and history against the original repository. In some cases, the automated migration may not perfectly preserve all historical data or complex branch structures. If any discrepancies are found in commit history, file content, or branch structure, a manual migration process might be required. This is especially important for repositories with complex branching patterns, large binary files, or extensive history.
+
+> Please allocate sufficient time for verification after TFVC migration before decommissioning the original repository.
 
 ## Parallel Migration
 

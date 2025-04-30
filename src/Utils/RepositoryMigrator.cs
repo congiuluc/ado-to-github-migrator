@@ -140,6 +140,22 @@ public class RepositoryMigrator
 
             Directory.SetCurrentDirectory(tempPath);
 
+            // Set HEAD to point to the desired default branch
+            Logger.LogInfo($"Setting HEAD symbolic reference to {mainBranchName}...");
+            var setHeadResult = await ProcessRunner.RunProcessAsync(
+                "git",
+                $"symbolic-ref HEAD refs/heads/{mainBranchName}",
+                workingDirectory: tempPath);
+
+            if (!setHeadResult.success)
+            {
+                Logger.LogWarning($"Failed to set HEAD symbolic reference: {setHeadResult.error}");
+            }
+            else
+            {
+                Logger.LogSuccess($"HEAD symbolic reference set to {mainBranchName}");
+            }
+            
             // Add GitHub remote and push
             Logger.LogInfo("Setting up GitHub remote...");
             var githubRemoteUrl = $"https://x-access-token:{githubPat}@github.com/{githubOrg}/{repoName}.git";
@@ -222,23 +238,24 @@ public class RepositoryMigrator
                     {
                         Logger.LogSuccess("Successfully pushed repository to GitHub");
 
-                        // Set default branch using GitHub CLI
-                        Logger.LogDebug($"Setting default branch to {mainBranchName} using GitHub CLI...");
-
+                        // Set default branch using GitHub API through GitHubService
+                        Logger.LogDebug($"Setting default branch to {mainBranchName}...");
                         
-                        var setDefaultBranchResult = await ProcessRunner.RunProcessAsync(
-                            "gh",
-                            $"api -X PATCH repos/{githubOrg}/{repoName} -f default_branch={mainBranchName}  -H \"Authorization: token {githubPat}",
-                            workingDirectory: tempPath);
-
-                        if (setDefaultBranchResult.success)
+                        try
                         {
+                            // Use the existing UpdateDefaultBranchAsync method directly
+                            if (!string.IsNullOrEmpty(githubPat) && githubPat != _githubService.GetPat())
+                            {
+                                _githubService.UpdatePat(githubPat);
+                            }
+                            
+                            await _githubService.UpdateDefaultBranchAsync(githubOrg, repoName, mainBranchName);
                             Logger.LogSuccess($"Successfully set default branch to {mainBranchName}");
                             Logger.LogSuccess("Repository was migrated successfully.");
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            Logger.LogWarning($"Failed to set default branch using GitHub CLI: {setDefaultBranchResult.error}");
+                            Logger.LogWarning($"Failed to set default branch: {ex.Message}");
                             Logger.LogWarning("Repository was migrated successfully, but default branch may need manual configuration.");
                         }
 
