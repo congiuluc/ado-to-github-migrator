@@ -330,6 +330,7 @@ public class GitHubService
             if (team != null)
             {
                 Logger.LogSuccess($"Found team {teamName}");
+                team.OrganizationName = organization;
                 return team;
             }
             return null;
