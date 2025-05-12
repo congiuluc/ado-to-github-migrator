@@ -325,8 +325,14 @@ public class GitHubService
     {
         try
         {
-            var teams = await InvokeApiAsync<List<GitHubTeamInfo>>($"orgs/{organization}/teams", HttpMethod.Get, cancellationToken: cancellationToken);
-            return teams?.FirstOrDefault(t => t.Name == teamName || t.Slug == teamName.ToLowerInvariant());
+            var teamSlug = teamName.ToLower().Replace(" ", "-");
+            var team = await InvokeApiAsync<GitHubTeamInfo>($"orgs/{organization}/teams/{teamSlug}", HttpMethod.Get, cancellationToken: cancellationToken);
+            if (team != null)
+            {
+                Logger.LogSuccess($"Found team {teamName}");
+                return team;
+            }
+            return null;
         }
         catch (Exception ex)
         {
