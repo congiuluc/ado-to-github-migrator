@@ -10,5 +10,5 @@ public class GitHubTeamInfo
     public string? Permission { get; set; }
     public string? Url { get; set; }
     public string? HtmlUrl { get; set; }
-    public string? Organization { get; set; }
+    public string? OrganizationName { get; set; }
 }
