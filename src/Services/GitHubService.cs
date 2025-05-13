@@ -42,26 +42,8 @@ public class GitHubService
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("AzureDevOps2GitHubMigrator", "1.0"));
 
         // Configure retry policy with exponential backoff
-        _retryPolicy = Policy<HttpResponseMessage>
-            .Handle<HttpRequestException>()
-            .Or<TaskCanceledException>()
-            .OrResult(response => (int)response.StatusCode >= 500 || response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-            .WaitAndRetryAsync(
-                3,
-                retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                onRetry: (exception, timeSpan, retryCount, context) =>
-                {
-                    if (exception.Result?.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                    {
-                        var resetTime = exception.Result.Headers.GetValues("X-RateLimit-Reset").FirstOrDefault();
-                        if (resetTime != null && DateTimeOffset.TryParse(resetTime, out var reset))
-                        {
-                            Logger.LogWarning($"Rate limit exceeded. Will reset at: {reset.LocalDateTime}");
-                        }
-                    }
-                    Logger.LogWarning($"Request failed. Retry attempt {retryCount} after {timeSpan.TotalSeconds} seconds. Error: {exception.Exception?.Message ?? exception.Result?.StatusCode.ToString()}");
-                }
-            );
+        _retryPolicy = GitHubApiRetryPolicy.Create(maxRetries: 5);
+       
     }
 
     private Uri BuildUrl(string relativeUrl) => new Uri($"{_baseUrl}/{relativeUrl.TrimStart('/')}");
