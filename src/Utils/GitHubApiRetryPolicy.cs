@@ -79,7 +79,7 @@ public class GitHubApiRetryPolicy
                     }
                     
                     // Default exponential backoff with jitter for other cases
-                    Random jitter = new Random();
+                    Random jitter = Random.Shared;
                     retryAfter = TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) + 
                                 TimeSpan.FromMilliseconds(jitter.Next(0, 1000));
 
