@@ -58,12 +58,8 @@ public class GitHubService
         var response = await _retryPolicy.ExecuteAsync(async () =>
             await _httpClient.SendAsync(request, cancellationToken));
             
-        // Add delay if configured to avoid GitHub API rate limiting issues
-        if (_requestWaitMilliseconds > 0)
-        {
-            Logger.LogDebug($"Waiting for {_requestWaitMilliseconds}ms before next GitHub API call");
-            await Task.Delay(_requestWaitMilliseconds, cancellationToken);
-        }
+        // Apply delay if configured to avoid GitHub API rate limiting issues
+        await ApplyRequestDelayAsync(cancellationToken);
             
         return response;
     }
