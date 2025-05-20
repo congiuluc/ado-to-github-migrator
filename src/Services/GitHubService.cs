@@ -1121,7 +1121,8 @@ public class GitHubService
             Logger.LogDebug($"Error getting latest GitHub commit: {ex.Message}");
             return null;
         }
-    }        /// <summary>
+    }        
+        /// <summary>
         /// Logs GitHub API rate limit information from response headers
         /// </summary>
         /// <param name="response">The HTTP response message containing rate limit headers</param>
@@ -1253,7 +1254,8 @@ public class GitHubService
                 // Don't let rate limit logging failures affect the main operation
                 Logger.LogDebug($"Failed to log rate limit info: {ex.Message}");
             }
-        }    /// <summary>
+        }    
+    /// <summary>
     /// Gets the current GitHub API rate limit status including core, search, and graphql limits
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
@@ -1362,5 +1364,6 @@ public class GitHubService
         {
             Logger.LogDebug($"Error parsing rate limit info for {resourceName}: {ex.Message}");
         }
+
     }
 }
