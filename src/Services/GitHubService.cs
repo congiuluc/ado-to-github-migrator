@@ -1077,7 +1077,8 @@ public class GitHubService
             body);
 
         return response != null;
-    }    /// <summary>
+    }
+    /// <summary>
     /// Gets the latest commit hash from a specific branch in a GitHub repository
     /// </summary>
     /// <param name="organization">GitHub organization name</param>
