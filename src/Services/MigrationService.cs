@@ -266,7 +266,8 @@ public class MigrationService
                     .Where(m => m?.Identity != null)
                     .Select(m => new MigrationTeamMember
                     {
-                        UniqueName = m.Identity?.UniqueName ?? string.Empty,                        DisplayName = m.Identity?.DisplayName ?? string.Empty,
+                        UniqueName = m.Identity?.UniqueName ?? string.Empty,
+                        DisplayName = m.Identity?.DisplayName ?? string.Empty,
                         IsTeamAdmin = m.IsTeamAdmin,
                         Id = m.Identity?.Id,
                         IsGroup = m.Identity?.IsContainer ?? false
