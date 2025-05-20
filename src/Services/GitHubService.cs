@@ -1241,7 +1241,7 @@ public class GitHubService
                         resetTimeFormatted = resetTime.ToString("yyyy-MM-dd HH:mm:ss");
                     }
                     
-                    Logger.LogInfo($"GitHub API Rate Limit ({resource}): {remaining}/{limit} remaining. Used: {used ?? "unknown"}. Resets at: {resetTimeFormatted}");
+                    Logger.LogDebug($"GitHub API Rate Limit ({resource}) {response?.RequestMessage?.RequestUri} : {remaining}/{limit} remaining. Used: {used ?? "unknown"}. Resets at: {resetTimeFormatted}");
                     
                     // Add warning if remaining requests are low
                     if (int.TryParse(remaining, out var remainingCount) && remainingCount < 100)
@@ -1260,7 +1260,7 @@ public class GitHubService
                         searchResetFormatted = resetTime.ToString("yyyy-MM-dd HH:mm:ss");
                     }
                     
-                    Logger.LogInfo($"GitHub Search API Rate Limit: {searchRemaining}/{searchLimit} remaining. Resets at: {searchResetFormatted}");
+                    Logger.LogDebug($"GitHub Search API Rate Limit: {searchRemaining}/{searchLimit} remaining. Resets at: {searchResetFormatted}");
                 }
 
                 // Log GraphQL API limits if available
