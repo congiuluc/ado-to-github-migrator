@@ -57,12 +57,17 @@ public class GitHubService
             request.Content = JsonContent.Create(body);
         }
 
+         if (_requestWaitMilliseconds > 0)
+            {
+                Logger.LogTrace($"Waiting for {_requestWaitMilliseconds}ms before GitHub API call");
+                await Task.Delay(_requestWaitMilliseconds, cancellationToken);
+            }         
+
         var response = await _retryPolicy.ExecuteAsync(async () =>
             await _httpClient.SendAsync(request, cancellationToken));
             
         // Apply delay if configured to avoid GitHub API rate limiting issues
-        await ApplyRequestDelayAsync(cancellationToken);
-            
+          
         return response;
     }
 
@@ -71,6 +76,12 @@ public class GitHubService
         try
         {
             Logger.LogDebug($"Invoking API: {method} {relativeUrl}");
+
+            if (_requestWaitMilliseconds > 0)
+            {
+                Logger.LogTrace($"Waiting for {_requestWaitMilliseconds}ms before GitHub API call");
+                await Task.Delay(_requestWaitMilliseconds, cancellationToken);
+            }
 
             var response = await SendRequestAsync(relativeUrl, method, body, cancellationToken);
 
@@ -81,6 +92,7 @@ public class GitHubService
             }            // Log rate limit information from response headers
             LogRateLimitInfo(response);
         
+
             response.EnsureSuccessStatusCode();
 
             if (response.Content.Headers.ContentLength == 0)
@@ -113,6 +125,11 @@ public class GitHubService
             {
                 query
             };
+            if (_requestWaitMilliseconds > 0)
+            {
+                Logger.LogTrace($"Waiting for {_requestWaitMilliseconds}ms before GitHub API call");
+                await Task.Delay(_requestWaitMilliseconds, cancellationToken);
+            }
 
             using var graphQLRequest = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/graphql");
             graphQLRequest.Content = JsonContent.Create(request);
@@ -123,11 +140,7 @@ public class GitHubService
             LogRateLimitInfo(response);
             
             // Add delay if configured to avoid GitHub API rate limiting issues
-            if (_requestWaitMilliseconds > 0)
-            {
-                Logger.LogDebug($"Waiting for {_requestWaitMilliseconds}ms before next GitHub API call");
-                await Task.Delay(_requestWaitMilliseconds, cancellationToken);
-            }
+
 
             response.EnsureSuccessStatusCode();
 

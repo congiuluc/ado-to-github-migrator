@@ -87,6 +87,9 @@ public class MigrationCommand
             var teamPattern = context.ParseResult.GetValueForOption(teamPatternOption) ?? config["Migration:TeamNamePattern"] ?? "{teamName}";
             var migrateTeams = context.ParseResult.GetValueForOption(migrateTeamsOption);
             var migrateTeamsConfig = config["Migration:MigrateTeams"];
+            int.TryParse(config["GitHub:RequestWaitMilliseconds"], out int ghRequestWaitMilliseconds);
+            
+
             if (!migrateTeams && !string.IsNullOrEmpty(migrateTeamsConfig))
             {
                 _ = bool.TryParse(migrateTeamsConfig, out migrateTeams);
@@ -141,7 +144,7 @@ public class MigrationCommand
 
                 // Create service instances
                 var adoService = new AzureDevOpsService(adoHttpClient, adoUrl, finalAdoPat!, adoVersion);
-                var githubService = new GitHubService(githubHttpClient, finalGithubPat!);
+                var githubService = new GitHubService(githubHttpClient, finalGithubPat!, requestWaitMilliseconds: ghRequestWaitMilliseconds);
                 
                 var migrationService = new MigrationService(adoService, githubService);
 

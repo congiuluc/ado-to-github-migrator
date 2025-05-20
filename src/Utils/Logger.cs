@@ -32,7 +32,7 @@ namespace AzureDevOps2GitHubMigrator.Utils
         /// <param name="message">The message to log</param>
         public static void LogTrace(string message)
         {
-            WriteToConsole(message, ConsoleColor.Cyan);
+            /*WriteToConsole(message, ConsoleColor.Cyan);*/
             WriteToFile("TRACE", message);
         }
 
