@@ -52,3 +52,4 @@ bld/
 .vscode/
 .vs/
 migrator_config.test.json
+scripts/
