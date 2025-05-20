@@ -22,19 +22,20 @@ public class GitHubService
     private readonly string _apiVersion;
     private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
     private readonly string _defaultTeamMemberRole;
-
-    public GitHubService(
+    private readonly int _requestWaitMilliseconds;    public GitHubService(
         HttpClient httpClient,
         string token = "",
         string baseUrl = "https://api.github.com",
         string apiVersion = "v3",
-        string defaultTeamMemberRole = "member")
+        string defaultTeamMemberRole = "member",
+        int requestWaitMilliseconds = 0)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _baseUrl = baseUrl.TrimEnd('/');
         _token = token;
         _apiVersion = apiVersion;
         _defaultTeamMemberRole = defaultTeamMemberRole;
+        _requestWaitMilliseconds = requestWaitMilliseconds;
 
         // Setup auth with token
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -46,9 +47,7 @@ public class GitHubService
        
     }
 
-    private Uri BuildUrl(string relativeUrl) => new Uri($"{_baseUrl}/{relativeUrl.TrimStart('/')}");
-
-    private async Task<HttpResponseMessage> SendRequestAsync(string relativeUrl, HttpMethod method, object? body = null, CancellationToken cancellationToken = default)
+    private Uri BuildUrl(string relativeUrl) => new Uri($"{_baseUrl}/{relativeUrl.TrimStart('/')}");    private async Task<HttpResponseMessage> SendRequestAsync(string relativeUrl, HttpMethod method, object? body = null, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(method, BuildUrl(relativeUrl));
         if (body != null)
@@ -56,8 +55,17 @@ public class GitHubService
             request.Content = JsonContent.Create(body);
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        var response = await _retryPolicy.ExecuteAsync(async () =>
             await _httpClient.SendAsync(request, cancellationToken));
+            
+        // Add delay if configured to avoid GitHub API rate limiting issues
+        if (_requestWaitMilliseconds > 0)
+        {
+            Logger.LogDebug($"Waiting for {_requestWaitMilliseconds}ms before next GitHub API call");
+            await Task.Delay(_requestWaitMilliseconds, cancellationToken);
+        }
+            
+        return response;
     }
 
     private async Task<T?> InvokeApiAsync<T>(string relativeUrl, HttpMethod method, object? body = null, CancellationToken cancellationToken = default)
@@ -109,11 +117,19 @@ public class GitHubService
             };
 
             using var graphQLRequest = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/graphql");
-            graphQLRequest.Content = JsonContent.Create(request);            var response = await _retryPolicy.ExecuteAsync(async () =>
+            graphQLRequest.Content = JsonContent.Create(request);
+            var response = await _retryPolicy.ExecuteAsync(async () =>
                 await _httpClient.SendAsync(graphQLRequest, cancellationToken));
             
             // Log rate limit information from GraphQL API call
             LogRateLimitInfo(response);
+            
+            // Add delay if configured to avoid GitHub API rate limiting issues
+            if (_requestWaitMilliseconds > 0)
+            {
+                Logger.LogDebug($"Waiting for {_requestWaitMilliseconds}ms before next GitHub API call");
+                await Task.Delay(_requestWaitMilliseconds, cancellationToken);
+            }
 
             response.EnsureSuccessStatusCode();
 
@@ -1295,24 +1311,6 @@ public class GitHubService
                 {
                     LogRateLimitResource("GraphQL API", graphql);
                 }
-                
-                // Log integration manifest API limits if present
-                if (resources.TryGetProperty("integration_manifest", out var integrationManifest))
-                {
-                    LogRateLimitResource("Integration Manifest API", integrationManifest);
-                }
-                
-                // Log code scanning upload API limits if present
-                if (resources.TryGetProperty("code_scanning_upload", out var codeScanningUpload))
-                {
-                    LogRateLimitResource("Code Scanning Upload API", codeScanningUpload);
-                }
-                
-                // Log SCIM API limits if present
-                if (resources.TryGetProperty("scim", out var scim))
-                {
-                    LogRateLimitResource("SCIM API", scim);
-                }
             }
             
             Logger.LogSuccess("Rate limit query completed successfully");
@@ -1364,6 +1362,5 @@ public class GitHubService
         {
             Logger.LogDebug($"Error parsing rate limit info for {resourceName}: {ex.Message}");
         }
-
     }
 }
