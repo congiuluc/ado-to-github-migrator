@@ -1311,6 +1311,24 @@ public class GitHubService
                 {
                     LogRateLimitResource("GraphQL API", graphql);
                 }
+    
+                // Log integration manifest API limits if present
+                if (resources.TryGetProperty("integration_manifest", out var integrationManifest))
+                {
+                    LogRateLimitResource("Integration Manifest API", integrationManifest);
+                }
+                
+                // Log code scanning upload API limits if present
+                if (resources.TryGetProperty("code_scanning_upload", out var codeScanningUpload))
+                {
+                    LogRateLimitResource("Code Scanning Upload API", codeScanningUpload);
+                }
+                
+                // Log SCIM API limits if present
+                if (resources.TryGetProperty("scim", out var scim))
+                {
+                    LogRateLimitResource("SCIM API", scim);
+                }
             }
             
             Logger.LogSuccess("Rate limit query completed successfully");
