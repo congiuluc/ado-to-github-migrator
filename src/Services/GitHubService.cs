@@ -22,7 +22,9 @@ public class GitHubService
     private readonly string _apiVersion;
     private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
     private readonly string _defaultTeamMemberRole;
-    private readonly int _requestWaitMilliseconds;    public GitHubService(
+    private readonly int _requestWaitMilliseconds;
+
+    public GitHubService(
         HttpClient httpClient,
         string token = "",
         string baseUrl = "https://api.github.com",
