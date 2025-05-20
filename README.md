@@ -4,26 +4,30 @@ A comprehensive .NET tool for migrating repositories, teams, and projects from A
 
 ## Overview
 
-This tool facilitates the migration of repositories, teams, and projects from Azure DevOps (both cloud and server versions) to GitHub. It handles Git repositories, team structures, and user mappings to ensure a smooth transition from Azure DevOps to GitHub.
+This tool facilitates the migration of repositories, teams, and projects from Azure DevOps (both cloud and server versions) to GitHub. It handles Git repositories, TFVC repositories, team structures, and user mappings to ensure a smooth transition from Azure DevOps to GitHub.
 
 ## Features
 
 - ✅ Migrate Git repositories from Azure DevOps to GitHub
+- ✅ Migrate TFVC repositories from Azure DevOps to GitHub
 - ✅ Support for Azure DevOps Cloud and Server versions (2017, 2019, 2020, 2022)
 - ✅ Migrate team structures and permissions
 - ✅ User mapping between Azure DevOps and GitHub
 - ✅ Pre-migration assessment reports
-- ✅ Detailed migration reporting
-- ✅ Tool installation verification (Git, Git-TFS)
+- ✅ Detailed migration reporting and logging
+- ✅ Tool installation verification (Git, GitHub CLI, Git-TFS)
 - ✅ Configurable naming patterns for repositories and teams
 - ✅ Support for automated CI/CD migration planning
 - ✅ Incremental migration capability
 - ✅ Migration validation and verification reports
+- ✅ Automated GitHub user export capabilities
+- ✅ Interactive console interface with color-coded messaging
 
 ## Prerequisites
 
 - .NET 9.0 SDK or runtime
 - Git (v2.30.0 or later recommended)
+- GitHub CLI (for certain operations)
 - Git-TFS (for TFVC repositories)
 - Personal Access Tokens with appropriate scopes:
   - **Azure DevOps PAT**: Requires Code (read), Project and team (read), User profile (read)
@@ -115,7 +119,7 @@ The migration process is controlled by a configuration file named `migrator_conf
     "MigrateTeams": true,
     "RepoNamePattern": "{projectName}-{repoName}",
     "TeamNamePattern": "{projectName}-{teamName}",
-    "UsersMappingFile": "path/to/user-mapping.csv",
+    "UsersMappingFile": "path/to/user-mapping.csv"
   },
   "Git": {
     "DisableSSLVerify": false,
@@ -137,7 +141,8 @@ Check if the required tools are installed and properly configured:
 
 ```bash
 AzureDevOps2GitHubMigrator check-git
-AzureDevOps2GitHubMigrator check-git-tfs
+AzureDevOps2GitHubMigrator check-github-cli
+AzureDevOps2GitHubMigrator check-tfvc
 ```
 
 ### Tool Installation (Windows only)
@@ -146,6 +151,7 @@ Install required tools automatically on Windows systems:
 
 ```bash
 AzureDevOps2GitHubMigrator install-git
+AzureDevOps2GitHubMigrator install-github-cli
 AzureDevOps2GitHubMigrator install-git-tfs
 ```
 
@@ -175,14 +181,25 @@ Export Azure DevOps users to create mapping file between Azure DevOps and GitHub
 AzureDevOps2GitHubMigrator export-users --config-file path/to/migrator_config.json --output-file path/to/users.csv
 ```
 
+Export GitHub users to help with user mapping:
+
+```bash
+AzureDevOps2GitHubMigrator export-github-users --config-file path/to/migrator_config.json --output-file path/to/github-users.csv
+```
+
+### User Mapping Management
+
+Create or update user mappings for the migration:
+
+```bash
+AzureDevOps2GitHubMigrator user-mapping --ado-users-file path/to/ado-users.csv --github-users-file path/to/github-users.csv --output-file path/to/user-mapping.csv
+```
+
 Available options:
-- `--ado-org`: Azure DevOps organization name
-- `--ado-pat`: Azure DevOps Personal Access Token
-- `--ado-version`: Azure DevOps version (e.g., cloud, 2022, 2020, 2019, 2017)
-- `--ado-baseurl`: Azure DevOps Server base URL
-- `--ado-projects`: Comma-separated list of project names
-- `--output-file`: Output file path for the CSV
-- `--config`: Path to the configuration file
+- `--ado-users-file`: Path to the Azure DevOps users CSV file
+- `--github-users-file`: Path to the GitHub users CSV file
+- `--output-file`: Path to save the mapping file
+- `--interactive`: Enable interactive mode for manual mapping
 
 ### Migration Execution
 
@@ -233,8 +250,8 @@ The `export-users` command helps generate the initial template with Azure DevOps
 ## Step-by-Step Migration Process
 
 1. **Environment Setup**:
-   - Install prerequisites (.NET 9.0, Git, Git-TFS)
-   - Verify installation using `check-git` and `check-git-tfs` commands
+   - Install prerequisites (.NET 9.0, Git, GitHub CLI, Git-TFS)
+   - Verify installation using the verification commands
    - Prepare Azure DevOps PAT with necessary scopes
    - Prepare GitHub PAT with necessary scopes
 
@@ -245,7 +262,8 @@ The `export-users` command helps generate the initial template with Azure DevOps
 
 3. **User Mapping**:
    - Export Azure DevOps users using the `export-users` command
-   - Map Azure DevOps users to their corresponding GitHub usernames
+   - Export GitHub users using the `export-github-users` command
+   - Create user mapping using the `user-mapping` command
    - Validate the mapping file format and completeness
 
 4. **Configuration Setup**:
@@ -256,7 +274,7 @@ The `export-users` command helps generate the initial template with Azure DevOps
 5. **Migration Execution**:
    - Run the migration command using your configuration file
    - Review the migration summary before confirming (unless `skip-confirmation` is enabled)
-   - Monitor the migration progress
+   - Monitor the migration progress through detailed logging
 
 6. **Post-Migration Verification**:
    - Generate a migration report to verify all repositories and teams were migrated correctly
@@ -264,7 +282,7 @@ The `export-users` command helps generate the initial template with Azure DevOps
    - Verify repository content and team memberships
 
 7. **Cleanup and Final Steps**:
-   - Review any warnings or errors in the migration report
+   - Review any warnings or errors in the migration logs and reports
    - Perform any necessary manual adjustments in GitHub
    - Update documentation and inform team members about the new GitHub URLs
 
@@ -289,6 +307,13 @@ For large organizations, you can run multiple instances of the migrator on diffe
 1. Split projects across multiple configuration files
 2. Run the migrator on different machines using different configuration files
 3. Use different working directories to avoid conflicts
+
+## Logging and Troubleshooting
+
+The tool generates detailed logs during migration:
+- Log files are saved with timestamp in the application directory (`migration_YYYYMMDD.log`)
+- Console output is color-coded for different message types (info, warning, error, success)
+- Detailed debugging information is available in the log files
 
 ## Common Issues and Solutions
 
@@ -327,3 +352,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 If you encounter any issues or have questions about using the Azure DevOps to GitHub Migrator, please file an issue in the GitHub repository.
+
+---
+
+Last updated: May 20, 2025

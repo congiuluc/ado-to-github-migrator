@@ -22,19 +22,22 @@ public class GitHubService
     private readonly string _apiVersion;
     private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
     private readonly string _defaultTeamMemberRole;
+    private readonly int _requestWaitMilliseconds;
 
     public GitHubService(
         HttpClient httpClient,
         string token = "",
         string baseUrl = "https://api.github.com",
         string apiVersion = "v3",
-        string defaultTeamMemberRole = "member")
+        string defaultTeamMemberRole = "member",
+        int requestWaitMilliseconds = 0)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _baseUrl = baseUrl.TrimEnd('/');
         _token = token;
         _apiVersion = apiVersion;
         _defaultTeamMemberRole = defaultTeamMemberRole;
+        _requestWaitMilliseconds = requestWaitMilliseconds;
 
         // Setup auth with token
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -46,9 +49,7 @@ public class GitHubService
        
     }
 
-    private Uri BuildUrl(string relativeUrl) => new Uri($"{_baseUrl}/{relativeUrl.TrimStart('/')}");
-
-    private async Task<HttpResponseMessage> SendRequestAsync(string relativeUrl, HttpMethod method, object? body = null, CancellationToken cancellationToken = default)
+    private Uri BuildUrl(string relativeUrl) => new Uri($"{_baseUrl}/{relativeUrl.TrimStart('/')}");    private async Task<HttpResponseMessage> SendRequestAsync(string relativeUrl, HttpMethod method, object? body = null, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(method, BuildUrl(relativeUrl));
         if (body != null)
@@ -56,8 +57,18 @@ public class GitHubService
             request.Content = JsonContent.Create(body);
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+         if (_requestWaitMilliseconds > 0)
+            {
+                Logger.LogTrace($"Waiting for {_requestWaitMilliseconds}ms before GitHub API call");
+                await Task.Delay(_requestWaitMilliseconds, cancellationToken);
+            }         
+
+        var response = await _retryPolicy.ExecuteAsync(async () =>
             await _httpClient.SendAsync(request, cancellationToken));
+            
+        // Apply delay if configured to avoid GitHub API rate limiting issues
+          
+        return response;
     }
 
     private async Task<T?> InvokeApiAsync<T>(string relativeUrl, HttpMethod method, object? body = null, CancellationToken cancellationToken = default)
@@ -65,6 +76,12 @@ public class GitHubService
         try
         {
             Logger.LogDebug($"Invoking API: {method} {relativeUrl}");
+
+            if (_requestWaitMilliseconds > 0)
+            {
+                Logger.LogTrace($"Waiting for {_requestWaitMilliseconds}ms before GitHub API call");
+                await Task.Delay(_requestWaitMilliseconds, cancellationToken);
+            }
 
             var response = await SendRequestAsync(relativeUrl, method, body, cancellationToken);
 
@@ -75,6 +92,7 @@ public class GitHubService
             }            // Log rate limit information from response headers
             LogRateLimitInfo(response);
         
+
             response.EnsureSuccessStatusCode();
 
             if (response.Content.Headers.ContentLength == 0)
@@ -107,13 +125,22 @@ public class GitHubService
             {
                 query
             };
+            if (_requestWaitMilliseconds > 0)
+            {
+                Logger.LogTrace($"Waiting for {_requestWaitMilliseconds}ms before GitHub API call");
+                await Task.Delay(_requestWaitMilliseconds, cancellationToken);
+            }
 
             using var graphQLRequest = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/graphql");
-            graphQLRequest.Content = JsonContent.Create(request);            var response = await _retryPolicy.ExecuteAsync(async () =>
+            graphQLRequest.Content = JsonContent.Create(request);
+            var response = await _retryPolicy.ExecuteAsync(async () =>
                 await _httpClient.SendAsync(graphQLRequest, cancellationToken));
             
             // Log rate limit information from GraphQL API call
             LogRateLimitInfo(response);
+            
+            // Add delay if configured to avoid GitHub API rate limiting issues
+
 
             response.EnsureSuccessStatusCode();
 
@@ -1214,7 +1241,7 @@ public class GitHubService
                         resetTimeFormatted = resetTime.ToString("yyyy-MM-dd HH:mm:ss");
                     }
                     
-                    Logger.LogInfo($"GitHub API Rate Limit ({resource}): {remaining}/{limit} remaining. Used: {used ?? "unknown"}. Resets at: {resetTimeFormatted}");
+                    Logger.LogDebug($"GitHub API Rate Limit ({resource}) {response?.RequestMessage?.RequestUri} : {remaining}/{limit} remaining. Used: {used ?? "unknown"}. Resets at: {resetTimeFormatted}");
                     
                     // Add warning if remaining requests are low
                     if (int.TryParse(remaining, out var remainingCount) && remainingCount < 100)
@@ -1233,7 +1260,7 @@ public class GitHubService
                         searchResetFormatted = resetTime.ToString("yyyy-MM-dd HH:mm:ss");
                     }
                     
-                    Logger.LogInfo($"GitHub Search API Rate Limit: {searchRemaining}/{searchLimit} remaining. Resets at: {searchResetFormatted}");
+                    Logger.LogDebug($"GitHub Search API Rate Limit: {searchRemaining}/{searchLimit} remaining. Resets at: {searchResetFormatted}");
                 }
 
                 // Log GraphQL API limits if available
@@ -1295,7 +1322,7 @@ public class GitHubService
                 {
                     LogRateLimitResource("GraphQL API", graphql);
                 }
-                
+    
                 // Log integration manifest API limits if present
                 if (resources.TryGetProperty("integration_manifest", out var integrationManifest))
                 {
@@ -1364,6 +1391,5 @@ public class GitHubService
         {
             Logger.LogDebug($"Error parsing rate limit info for {resourceName}: {ex.Message}");
         }
-
     }
 }
