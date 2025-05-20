@@ -72,8 +72,9 @@ public class GitHubService
             {
                 Logger.LogDebug($"API returned 404 Not Found: {relativeUrl}");
                 return default;
-            }
-
+            }            // Log rate limit information from response headers
+            LogRateLimitInfo(response);
+        
             response.EnsureSuccessStatusCode();
 
             if (response.Content.Headers.ContentLength == 0)
@@ -108,10 +109,11 @@ public class GitHubService
             };
 
             using var graphQLRequest = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/graphql");
-            graphQLRequest.Content = JsonContent.Create(request);
-
-            var response = await _retryPolicy.ExecuteAsync(async () =>
+            graphQLRequest.Content = JsonContent.Create(request);            var response = await _retryPolicy.ExecuteAsync(async () =>
                 await _httpClient.SendAsync(graphQLRequest, cancellationToken));
+            
+            // Log rate limit information from GraphQL API call
+            LogRateLimitInfo(response);
 
             response.EnsureSuccessStatusCode();
 
@@ -1117,6 +1119,247 @@ public class GitHubService
         {
             Logger.LogDebug($"Error getting latest GitHub commit: {ex.Message}");
             return null;
+        }
+    }        /// <summary>
+        /// Logs GitHub API rate limit information from response headers
+        /// </summary>
+        /// <param name="response">The HTTP response message containing rate limit headers</param>
+        private void LogRateLimitInfo(HttpResponseMessage response)
+        {
+            try
+            {
+                // Check if rate limit headers are present
+                string? limit = null;
+                string? remaining = null;
+                string? resetTimestamp = null;
+                string? used = null;
+                string? resource = "core"; // Default resource type
+
+                if (response.Headers.TryGetValues("X-RateLimit-Limit", out var limitValues))
+                {
+                    limit = limitValues.FirstOrDefault();
+                }
+                
+                if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var remainingValues))
+                {
+                    remaining = remainingValues.FirstOrDefault();
+                }
+                
+                if (response.Headers.TryGetValues("X-RateLimit-Reset", out var resetValues))
+                {
+                    resetTimestamp = resetValues.FirstOrDefault();
+                }
+                
+                if (response.Headers.TryGetValues("X-RateLimit-Used", out var usedValues))
+                {
+                    used = usedValues.FirstOrDefault();
+                }
+                
+                // Check for resource-specific rate limit headers
+                if (response.Headers.TryGetValues("X-RateLimit-Resource", out var resourceValues))
+                {
+                    resource = resourceValues.FirstOrDefault() ?? resource;
+                }
+
+                // Check if we're hitting search API rate limits
+                string? searchLimit = null;
+                string? searchRemaining = null;
+                string? searchReset = null;
+                
+                if (response.Headers.TryGetValues("X-RateLimit-Search-Limit", out var searchLimitValues))
+                {
+                    searchLimit = searchLimitValues.FirstOrDefault();
+                }
+                
+                if (response.Headers.TryGetValues("X-RateLimit-Search-Remaining", out var searchRemainingValues))
+                {
+                    searchRemaining = searchRemainingValues.FirstOrDefault();
+                }
+                
+                if (response.Headers.TryGetValues("X-RateLimit-Search-Reset", out var searchResetValues))
+                {
+                    searchReset = searchResetValues.FirstOrDefault();
+                }
+
+                // Check if we're hitting GraphQL API rate limits
+                string? graphqlLimit = null;
+                string? graphqlRemaining = null;
+                string? graphqlReset = null;
+                
+                if (response.Headers.TryGetValues("X-RateLimit-GraphQL-Limit", out var graphqlLimitValues))
+                {
+                    graphqlLimit = graphqlLimitValues.FirstOrDefault();
+                }
+                
+                if (response.Headers.TryGetValues("X-RateLimit-GraphQL-Remaining", out var graphqlRemainingValues))
+                {
+                    graphqlRemaining = graphqlRemainingValues.FirstOrDefault();
+                }
+                
+                if (response.Headers.TryGetValues("X-RateLimit-GraphQL-Reset", out var graphqlResetValues))
+                {
+                    graphqlReset = graphqlResetValues.FirstOrDefault();
+                }
+
+                // If we have rate limit info, log it
+                if (!string.IsNullOrEmpty(limit) && !string.IsNullOrEmpty(remaining))
+                {
+                    // Convert reset timestamp to readable time if available
+                    string resetTimeFormatted = "unknown";
+                    if (!string.IsNullOrEmpty(resetTimestamp) && long.TryParse(resetTimestamp, out var resetEpoch))
+                    {
+                        var resetTime = DateTimeOffset.FromUnixTimeSeconds(resetEpoch).LocalDateTime;
+                        resetTimeFormatted = resetTime.ToString("yyyy-MM-dd HH:mm:ss");
+                    }
+                    
+                    Logger.LogInfo($"GitHub API Rate Limit ({resource}): {remaining}/{limit} remaining. Used: {used ?? "unknown"}. Resets at: {resetTimeFormatted}");
+                    
+                    // Add warning if remaining requests are low
+                    if (int.TryParse(remaining, out var remainingCount) && remainingCount < 100)
+                    {
+                        Logger.LogWarning($"GitHub API rate limit is getting low: {remainingCount} requests remaining for {resource} operations!");
+                    }
+                }
+
+                // Log search API limits if available
+                if (!string.IsNullOrEmpty(searchLimit) && !string.IsNullOrEmpty(searchRemaining))
+                {
+                    string searchResetFormatted = "unknown";
+                    if (!string.IsNullOrEmpty(searchReset) && long.TryParse(searchReset, out var searchResetEpoch))
+                    {
+                        var resetTime = DateTimeOffset.FromUnixTimeSeconds(searchResetEpoch).LocalDateTime;
+                        searchResetFormatted = resetTime.ToString("yyyy-MM-dd HH:mm:ss");
+                    }
+                    
+                    Logger.LogInfo($"GitHub Search API Rate Limit: {searchRemaining}/{searchLimit} remaining. Resets at: {searchResetFormatted}");
+                }
+
+                // Log GraphQL API limits if available
+                if (!string.IsNullOrEmpty(graphqlLimit) && !string.IsNullOrEmpty(graphqlRemaining))
+                {
+                    string graphqlResetFormatted = "unknown";
+                    if (!string.IsNullOrEmpty(graphqlReset) && long.TryParse(graphqlReset, out var graphqlResetEpoch))
+                    {
+                        var resetTime = DateTimeOffset.FromUnixTimeSeconds(graphqlResetEpoch).LocalDateTime;
+                        graphqlResetFormatted = resetTime.ToString("yyyy-MM-dd HH:mm:ss");
+                    }
+                    
+                    Logger.LogInfo($"GitHub GraphQL API Rate Limit: {graphqlRemaining}/{graphqlLimit} remaining. Resets at: {graphqlResetFormatted}");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Don't let rate limit logging failures affect the main operation
+                Logger.LogDebug($"Failed to log rate limit info: {ex.Message}");
+            }
+        }    /// <summary>
+    /// Gets the current GitHub API rate limit status including core, search, and graphql limits
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Task representing the asynchronous operation</returns>
+    public async Task GetAndLogRateLimitStatusAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            Logger.LogInfo("Querying GitHub API rate limit status...");
+            
+            // Make a direct call to rate limit endpoint which will return all rate limit info
+            var response = await InvokeApiAsync<JsonDocument>("rate_limit", HttpMethod.Get, cancellationToken: cancellationToken);
+            
+            if (response == null)
+            {
+                Logger.LogWarning("Failed to retrieve rate limit information.");
+                return;
+            }
+            
+            // Parse and log detailed rate limit information
+            if (response.RootElement.TryGetProperty("resources", out var resources))
+            {
+                // Log Core API limits
+                if (resources.TryGetProperty("core", out var core))
+                {
+                    LogRateLimitResource("Core API", core);
+                }
+                
+                // Log Search API limits
+                if (resources.TryGetProperty("search", out var search))
+                {
+                    LogRateLimitResource("Search API", search);
+                }
+                
+                // Log GraphQL API limits
+                if (resources.TryGetProperty("graphql", out var graphql))
+                {
+                    LogRateLimitResource("GraphQL API", graphql);
+                }
+                
+                // Log integration manifest API limits if present
+                if (resources.TryGetProperty("integration_manifest", out var integrationManifest))
+                {
+                    LogRateLimitResource("Integration Manifest API", integrationManifest);
+                }
+                
+                // Log code scanning upload API limits if present
+                if (resources.TryGetProperty("code_scanning_upload", out var codeScanningUpload))
+                {
+                    LogRateLimitResource("Code Scanning Upload API", codeScanningUpload);
+                }
+                
+                // Log SCIM API limits if present
+                if (resources.TryGetProperty("scim", out var scim))
+                {
+                    LogRateLimitResource("SCIM API", scim);
+                }
+            }
+            
+            Logger.LogSuccess("Rate limit query completed successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to query rate limit status: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Helper method to log rate limit information for a specific GitHub API resource
+    /// </summary>
+    /// <param name="resourceName">Name of the API resource</param>
+    /// <param name="resourceElement">JsonElement containing rate limit data</param>
+    private void LogRateLimitResource(string resourceName, JsonElement resourceElement)
+    {
+        try
+        {
+            int limit = resourceElement.GetProperty("limit").GetInt32();
+            int remaining = resourceElement.GetProperty("remaining").GetInt32();
+            long resetTimestamp = resourceElement.GetProperty("reset").GetInt64();
+            int used = resourceElement.GetProperty("used").GetInt32();
+            
+            // Convert Unix timestamp to readable date
+            var resetTime = DateTimeOffset.FromUnixTimeSeconds(resetTimestamp).LocalDateTime;
+            
+            var percentUsed = limit > 0 ? (used * 100.0 / limit) : 0;
+            
+            // Format the message
+            var message = $"{resourceName} Rate Limit: {remaining}/{limit} remaining " +
+                         $"({percentUsed:F1}% used). Resets at: {resetTime:yyyy-MM-dd HH:mm:ss}";
+            
+            // Use appropriate log level based on remaining capacity
+            if (remaining <= 10)
+            {
+                Logger.LogError(message); // Critical - almost no requests left
+            }
+            else if (remaining < limit * 0.1)
+            {
+                Logger.LogWarning(message); // Warning - less than 10% remaining
+            }
+            else
+            {
+                Logger.LogInfo(message); // Info - normal levels
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug($"Error parsing rate limit info for {resourceName}: {ex.Message}");
         }
     }
 }
