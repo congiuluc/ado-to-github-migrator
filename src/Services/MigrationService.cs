@@ -266,11 +266,10 @@ public class MigrationService
                     .Where(m => m?.Identity != null)
                     .Select(m => new MigrationTeamMember
                     {
-                        UniqueName = m.Identity?.UniqueName ?? string.Empty,
-                        DisplayName = m.Identity?.DisplayName ?? string.Empty,
+                        UniqueName = m.Identity?.UniqueName ?? string.Empty,                        DisplayName = m.Identity?.DisplayName ?? string.Empty,
                         IsTeamAdmin = m.IsTeamAdmin,
                         Id = m.Identity?.Id,
-                        IsGroup = m.Identity.IsContainer
+                        IsGroup = m.Identity?.IsContainer ?? false
 
                     })
                     .ToList() ?? new List<MigrationTeamMember>(),
@@ -343,16 +342,21 @@ public class MigrationService
                         gitDisableSslVerify: gitDisableSslVerify,
                         gitUsePatForClone: gitUsePatForClone
                     );
-
-                    if (repoMigrated)
+                    repo.GitHubRepoMigrationStatus = repoMigrated;
+                    switch (repoMigrated)
                     {
-                        repo.GitHubRepoMigrationStatus = MigrationStatus.Completed;
-                        Logger.LogSuccess($"Successfully migrated repository: {repo.Name}");
-                    }
-                    else
-                    {
-                        repo.GitHubRepoMigrationStatus = MigrationStatus.Failed;
-                        Logger.LogError($"Failed to migrate repository: {repo.Name}");
+                        case MigrationStatus.Completed:
+                            Logger.LogSuccess($"Successfully migrated repository: {repo.Name}");
+                            break;
+                        case MigrationStatus.PartiallyCompleted:
+                            Logger.LogWarning($"Partially migrated repository: {repo.Name} - some commits may not match");
+                            break;
+                        case MigrationStatus.Skipped:
+                            Logger.LogInfo($"Repository migration skipped: {repo.Name}");
+                            break;
+                        default:
+                            Logger.LogError($"Failed to migrate repository: {repo.Name}");
+                            break;
                     }
                 }
 

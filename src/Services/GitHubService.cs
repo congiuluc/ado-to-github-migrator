@@ -88,12 +88,12 @@ public class GitHubService
         }
         catch (HttpRequestException ex)
         {
-            Logger.LogError($"HTTP request exception for API call: {ex.Message}", ex);
+            Logger.LogDebug($"HTTP request exception for API call: {ex.Message}");
             throw new Exception($"GitHub API call failed after retries: {ex.Message}", ex);
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Unexpected exception for API call: {ex.Message}", ex);
+            Logger.LogDebug($"Unexpected exception for API call: {ex.Message}");
             throw;
         }
     }
@@ -501,6 +501,47 @@ public class GitHubService
         {
             Logger.LogError($"Failed to check if repository is empty: {ex.Message}", ex);
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Checks if a GitHub repository has no commits (is empty)
+    /// </summary>
+    /// <param name="organization">GitHub organization name</param>
+    /// <param name="repoName">Repository name</param>
+    /// <returns>True if the repository is empty, false otherwise</returns>
+    public async Task<bool> IsRepositoryEmptyAsync(string organization, string repoName)
+    {
+        try
+        {
+            // Get commits with a limit of 1 to check if the repository has any commits
+            var commits = await InvokeApiAsync<List<object>>($"repos/{organization}/{repoName}/commits?per_page=1", HttpMethod.Get);
+            
+            // If the returned array is empty, the repository has no commits
+            return commits == null || commits.Count == 0;
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                // Repository does not exist or is empty
+                return true;
+            }
+            
+            Logger.LogWarning($"Failed to get commits info for {organization}/{repoName}: {ex.Message}");
+            // If we can't check, assume it's not empty to be safe
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug($"Error checking if repository is empty: {ex.Message}");
+            if (ex.Message.Contains("409"))
+            {
+                // Repository does not exist or is empty
+                return true;
+            }
+            // If there's an error, assume it's not empty to be safe
+            return false;
         }
     }
 
@@ -1034,5 +1075,48 @@ public class GitHubService
             body);
 
         return response != null;
+    }    /// <summary>
+    /// Gets the latest commit hash from a specific branch in a GitHub repository
+    /// </summary>
+    /// <param name="organization">GitHub organization name</param>
+    /// <param name="repoName">Repository name</param>
+    /// <param name="branchName">Branch name to check</param>
+    /// <returns>Latest commit hash or null if not found</returns>
+    public async Task<string?> GetBranchLatestCommitAsync(string organization, string repoName, string branchName)
+    {
+        try
+        {
+            // Get branch information from the GitHub API
+            var url = $"repos/{organization}/{repoName}/branches/{branchName}";
+            var response = await _httpClient.GetAsync(BuildUrl(url));
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.LogWarning($"Failed to get branch info: {response.StatusCode}");
+                return null;
+            }
+            
+            var content = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(content);
+            
+            // Extract commit SHA from the response
+            if (doc.RootElement.TryGetProperty("commit", out var commit) &&
+                commit.TryGetProperty("sha", out var sha))
+            {
+                return sha.GetString();
+            }
+            
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning($"Failed to get branch info for {organization}/{repoName}/{branchName}: {ex.Message}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug($"Error getting latest GitHub commit: {ex.Message}");
+            return null;
+        }
     }
 }
